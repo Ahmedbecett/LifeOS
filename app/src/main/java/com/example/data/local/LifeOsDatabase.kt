@@ -43,7 +43,7 @@ abstract class LifeOsDatabase : RoomDatabase() {
                     LifeOsDatabase::class.java,
                     "lifeos_database.db"
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(true)
                 .addCallback(DatabaseCallback(scope))
                 .build()
                 INSTANCE = instance
