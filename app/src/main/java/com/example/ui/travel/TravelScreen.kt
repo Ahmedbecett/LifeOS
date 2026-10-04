@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CardTravel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Flight
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.TripPlan
 import com.example.localization.LocalizationManager
 import com.example.ui.LifeOsViewModel
+import com.example.ui.components.ProgressBarWithLabel
 import com.example.ui.theme.AmberAccent
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldSuccess
@@ -102,7 +104,7 @@ fun TravelScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Itineraries, budgets, packing lists & translation guides",
+                            text = "Itineraries, multi-currency budgets, packing & documents",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -137,7 +139,7 @@ fun TravelScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Use the LifeOS AI assistant or tap '+' below to organize your next adventure.",
+                                text = "Use LifeOS AI or tap '+' below to organize your next adventure.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -173,8 +175,8 @@ fun TravelScreen(
     if (showAddDialog) {
         AddTripDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { dest, days, budget, accom, itn, pack, phr ->
-                viewModel.addTrip(dest, days, budget, accom, itn, pack, phr)
+            onAdd = { dest, start, end, days, budget, spent, curr, accom, itn, pack, phr, docs ->
+                viewModel.addTrip(dest, start, end, days, budget, spent, curr, accom, itn, pack, phr, docs)
                 showAddDialog = false
             }
         )
@@ -188,7 +190,15 @@ fun TripDetailCard(
 ) {
     var expanded by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Itinerary", "Budget", "Packing", "Phrases")
+    val tabs = listOf("Itinerary", "Budget", "Packing", "Documents", "Phrases")
+
+    val currSymbol = when (trip.currency) {
+        "EUR" -> "€"
+        "GBP" -> "£"
+        "TRY" -> "₺"
+        "SAR" -> "﷼"
+        else -> "$"
+    }
 
     Card(
         modifier = Modifier
@@ -224,7 +234,7 @@ fun TripDetailCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${trip.durationDays} Days • Budget: $${trip.budget.toInt()} • ${trip.startDate}",
+                        text = "${trip.durationDays} Days • Budget: $currSymbol${trip.budget.toInt()} • ${trip.startDate}${if (trip.endDate.isNotBlank()) " - ${trip.endDate}" else ""}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -258,7 +268,7 @@ fun TripDetailCard(
                             Tab(
                                 selected = selectedTab == index,
                                 onClick = { selectedTab = index },
-                                text = { Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                text = { Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                             )
                         }
                     }
@@ -282,36 +292,50 @@ fun TripDetailCard(
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Payments,
-                                            contentDescription = "Budget",
-                                            tint = EmeraldSuccess
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                text = "Total Allocated Budget: $${trip.budget.toInt()}",
-                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                                color = MaterialTheme.colorScheme.onSurface
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Payments,
+                                                contentDescription = "Budget",
+                                                tint = EmeraldSuccess
                                             )
-                                            Text(
-                                                text = "Accommodation: ${trip.accommodation.ifBlank { "Boutique Hotel / Cave Hotel" }}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Total Budget: $currSymbol${trip.budget.toInt()} (${trip.currency})",
+                                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "Spent So Far: $currSymbol${trip.spentAmount.toInt()}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        ProgressBarWithLabel(
+                                            label = "Budget Consumption",
+                                            current = trip.spentAmount,
+                                            target = trip.budget,
+                                            color = EmeraldSuccess
+                                        )
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = trip.notes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "Accommodation: ${trip.accommodation.ifBlank { "Boutique Hotel / Cave Hotel" }}",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
+                                if (trip.notes.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = trip.notes,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                         2 -> {
@@ -359,7 +383,52 @@ fun TripDetailCard(
                             }
                         }
                         3 -> {
-                            // Phrases
+                            // Travel Documents Section
+                            val documentItems = trip.documentsJson.lines().filter { it.isNotBlank() }
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                documentItems.forEach { doc ->
+                                    var verified by remember { mutableStateOf(false) }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { verified = !verified }
+                                            .background(if (verified) EmeraldSuccess.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant)
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Description,
+                                            contentDescription = "Document",
+                                            tint = if (verified) EmeraldSuccess else IndigoAccent,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = doc,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontWeight = if (verified) FontWeight.Bold else FontWeight.Normal
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Surface(
+                                            color = if (verified) EmeraldSuccess.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = if (verified) "READY" else "PENDING",
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = if (verified) EmeraldSuccess else AmberAccent
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        4 -> {
+                            // Phrases & Translations
                             Text(
                                 text = trip.usefulPhrasesJson.ifBlank { "No translation phrases added." },
                                 style = MaterialTheme.typography.bodySmall.copy(lineHeight = 22.sp),
@@ -376,25 +445,44 @@ fun TripDetailCard(
 @Composable
 fun AddTripDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, Int, Double, String, String, String, String) -> Unit
+    onAdd: (String, String, String, Int, Double, Double, String, String, String, String, String, String) -> Unit
 ) {
     var destination by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf("Nov 12, 2026") }
+    var endDate by remember { mutableStateOf("Nov 19, 2026") }
     var durationDays by remember { mutableStateOf("7") }
     var budget by remember { mutableStateOf("800") }
+    var currency by remember { mutableStateOf("USD") }
     var accommodation by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+
+    val currencies = listOf("USD", "EUR", "GBP", "TRY", "SAR")
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Plan New Trip") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = destination,
                     onValueChange = { destination = it },
                     label = { Text("Destination (e.g. Turkey - Istanbul)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = startDate,
+                        onValueChange = { startDate = it },
+                        label = { Text("Start Date") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = endDate,
+                        onValueChange = { endDate = it },
+                        label = { Text("End Date") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = durationDays,
@@ -405,10 +493,31 @@ fun AddTripDialog(
                     OutlinedTextField(
                         value = budget,
                         onValueChange = { budget = it },
-                        label = { Text("Budget ($)") },
+                        label = { Text("Budget") },
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                Text("Currency:", style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    currencies.forEach { curr ->
+                        val isSel = currency == curr
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { currency = curr },
+                            color = if (isSel) CyanAccent else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = curr,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = accommodation,
                     onValueChange = { accommodation = it },
@@ -429,7 +538,20 @@ fun AddTripDialog(
                     if (destination.isNotBlank()) {
                         val days = durationDays.toIntOrNull() ?: 7
                         val budg = budget.toDoubleOrNull() ?: 800.0
-                        onAdd(destination, days, budg, accommodation, notes, "Passport\nCharger\nCash", "Hello = Merhaba")
+                        onAdd(
+                            destination,
+                            startDate,
+                            endDate,
+                            days,
+                            budg,
+                            0.0,
+                            currency,
+                            accommodation,
+                            notes,
+                            "Passport & Visa copy\nUniversal charger\nComfortable sneakers\nWeather clothing",
+                            "Hello = Merhaba / Bonjour\nThank you = Teşekkürler / Merci\nHow much? = Ne kadar? / Combien?",
+                            "Passport (valid 6+ months)\nE-Visa Approval\nFlight Confirmation\nHotel Voucher"
+                        )
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)

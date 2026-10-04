@@ -252,9 +252,11 @@ fun SmartDashboardScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         val presets = listOf(
-                            "✈️ Turkey 7-day ($800)" to "I’m traveling to Turkey next month for 7 days with a budget of $800. Help me organize everything.",
-                            "🎓 Exam in 3 weeks" to "I have an exam in three weeks and I need a study plan.",
-                            "💰 Save $1,000" to "I need to save $1,000 in six months.",
+                            "⚡ Plan my day" to "Plan my day with optimal productivity, deep work and evening wind-down.",
+                            "🎓 Create a study plan" to "Create a study plan for my upcoming courses and exams.",
+                            "✈️ Plan a trip" to "I’m traveling to Turkey next month for 7 days with a budget of $800. Help me organize everything.",
+                            "💰 Track my expenses" to "Track my expenses and build a 6-month $1,000 savings roadmap.",
+                            "🛒 Create a shopping list" to "Create a shopping list with weekly groceries and essentials.",
                             "🚚 Move to new city" to "I’m moving to another city next month."
                         )
                         presets.forEach { (label, prompt) ->

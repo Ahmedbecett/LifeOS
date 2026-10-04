@@ -1,5 +1,6 @@
 package com.example.ui.tasks
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,6 +36,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,11 +48,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.model.TaskItem
 import com.example.localization.LocalizationManager
 import com.example.ui.LifeOsViewModel
@@ -63,15 +71,23 @@ fun TasksScreen(
     val language by viewModel.currentLanguage.collectAsState()
     val strings = LocalizationManager.getStrings(language)
     val tasks by viewModel.allTasks.collectAsState()
+    val searchQuery by viewModel.taskSearchQuery.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
+    var selectedPriority by remember { mutableStateOf("ALL") }
     var showAddDialog by remember { mutableStateOf(false) }
 
     val categories = listOf("ALL", "GENERAL", "STUDY", "WORK", "TRAVEL", "FINANCE", "SHOPPING")
-    val filteredTasks = if (selectedCategory == "ALL") {
-        tasks
-    } else {
-        tasks.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+    val priorities = listOf("ALL", "HIGH", "MEDIUM", "LOW")
+
+    val filteredTasks = tasks.filter { task ->
+        val matchesCategory = selectedCategory == "ALL" || task.category.equals(selectedCategory, ignoreCase = true)
+        val matchesPriority = selectedPriority == "ALL" || task.priority.equals(selectedPriority, ignoreCase = true)
+        val matchesSearch = searchQuery.isBlank() ||
+                task.title.contains(searchQuery, ignoreCase = true) ||
+                task.description.contains(searchQuery, ignoreCase = true) ||
+                task.dueDate.contains(searchQuery, ignoreCase = true)
+        matchesCategory && matchesPriority && matchesSearch
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -95,7 +111,7 @@ fun TasksScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "To-dos, deadlines, and smart daily routines",
+                            text = "To-dos, deadlines, smart filtering & reminders",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -103,11 +119,39 @@ fun TasksScreen(
                 }
             }
 
-            // Category Tabs
+            // Search Bar
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.setTaskSearchQuery(it) },
+                    placeholder = { Text("Search tasks, notes or deadlines...") },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = CyanAccent)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setTaskSearchQuery("") }) {
+                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("task_search_field"),
+                    shape = RoundedCornerShape(14.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyanAccent,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+
+            // Category Filter Tabs
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp)
+                    contentPadding = PaddingValues(vertical = 2.dp)
                 ) {
                     items(categories) { cat ->
                         CategoryChip(
@@ -115,6 +159,35 @@ fun TasksScreen(
                             isSelected = selectedCategory == cat,
                             onClick = { selectedCategory = cat }
                         )
+                    }
+                }
+            }
+
+            // Priority Filter Chips
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Priority:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    priorities.forEach { prio ->
+                        val isSel = selectedPriority == prio
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedPriority = prio },
+                            color = if (isSel) CyanAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = prio,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                color = if (isSel) CyanAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -140,13 +213,13 @@ fun TasksScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "All Caught Up!",
+                                text = "No Matching Tasks",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "No pending tasks in $selectedCategory.",
+                                text = "Try clearing your search query or add a new task below.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -185,8 +258,8 @@ fun TasksScreen(
         AddTaskDialog(
             defaultCategory = if (selectedCategory != "ALL") selectedCategory else "GENERAL",
             onDismiss = { showAddDialog = false },
-            onAdd = { title, desc, cat, prio, date ->
-                viewModel.addTask(title, desc, cat, prio, date)
+            onAdd = { title, desc, cat, prio, date, reminder ->
+                viewModel.addTask(title, desc, cat, prio, date, reminder)
                 showAddDialog = false
             }
         )
@@ -236,12 +309,29 @@ fun TaskCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (task.dueDate.isNotBlank()) {
-                    Text(
-                        text = "Due: ${task.dueDate} • [${task.category}]",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (task.dueDate.isNotBlank()) {
+                        Text(
+                            text = "Due: ${task.dueDate} • [${task.category}]",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (task.reminderTime.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = "Reminder",
+                            tint = CyanAccent,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = task.reminderTime,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CyanAccent
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -262,19 +352,20 @@ fun TaskCard(
 fun AddTaskDialog(
     defaultCategory: String,
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, String, String) -> Unit
+    onAdd: (String, String, String, String, String, String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(defaultCategory) }
     var priority by remember { mutableStateOf("MEDIUM") }
     var dueDate by remember { mutableStateOf("Today") }
+    var reminderTime by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add New Task") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -287,16 +378,24 @@ fun AddTaskDialog(
                     label = { Text("Notes / Details (Optional)") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = dueDate,
-                    onValueChange = { dueDate = it },
-                    label = { Text("Due Date / Time") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = dueDate,
+                        onValueChange = { dueDate = it },
+                        label = { Text("Due Date") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = reminderTime,
+                        onValueChange = { reminderTime = it },
+                        label = { Text("Reminder (e.g. 18:00)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Category (GENERAL, STUDY, WORK, TRAVEL)") },
+                    label = { Text("Category (GENERAL, STUDY, WORK, TRAVEL, FINANCE)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -311,7 +410,7 @@ fun AddTaskDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title, description, category.uppercase(), priority.uppercase(), dueDate)
+                        onAdd(title, description, category.uppercase(), priority.uppercase(), dueDate, reminderTime)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)

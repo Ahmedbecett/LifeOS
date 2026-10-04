@@ -55,7 +55,6 @@ import com.example.localization.LocalizationManager
 import com.example.ui.LifeOsViewModel
 import com.example.ui.theme.AmberAccent
 import com.example.ui.theme.CyanAccent
-import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.RoseError
 
 @Composable
@@ -73,8 +72,8 @@ fun ShoppingScreen(
     val isWishlistTab = selectedTab == 1
     val displayedItems = shoppingItems.filter { it.isWishlist == isWishlistTab }
 
-    val totalPrice = displayedItems.sumOf { it.estimatedPrice }
-    val remainingPrice = displayedItems.filter { !it.isPurchased }.sumOf { it.estimatedPrice }
+    val totalPrice = displayedItems.sumOf { it.estimatedPrice * it.quantity }
+    val remainingPrice = displayedItems.filter { !it.isPurchased }.sumOf { it.estimatedPrice * it.quantity }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -141,7 +140,7 @@ fun ShoppingScreen(
                     ) {
                         Column {
                             Text(
-                                text = if (isWishlistTab) "Wishlist Value" else "Estimated List Total",
+                                text = if (isWishlistTab) "Wishlist Total Value" else "Total Estimated Cost",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -231,17 +230,27 @@ fun ShoppingScreen(
                                     color = if (item.isPurchased) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = item.category,
+                                    text = "Qty: ${item.quantity} • [${item.category}]",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             if (item.estimatedPrice > 0) {
-                                Text(
-                                    text = "$${String.format("%.2f", item.estimatedPrice)}",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = CyanAccent
-                                )
+                                val itemTotal = item.estimatedPrice * item.quantity
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "$${String.format("%.2f", itemTotal)}",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = CyanAccent
+                                    )
+                                    if (item.quantity > 1) {
+                                        Text(
+                                            text = "($${String.format("%.2f", item.estimatedPrice)} ea)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                             IconButton(onClick = { viewModel.deleteShoppingItem(item) }) {
                                 Icon(
@@ -278,8 +287,8 @@ fun ShoppingScreen(
         AddShoppingDialog(
             isWishlistInitial = isWishlistTab,
             onDismiss = { showAddDialog = false },
-            onAdd = { name, cat, price, isWishlist ->
-                viewModel.addShoppingItem(name, cat, price, isWishlist)
+            onAdd = { name, cat, qty, price, isWishlist ->
+                viewModel.addShoppingItem(name, cat, qty, price, isWishlist)
                 showAddDialog = false
             }
         )
@@ -290,10 +299,11 @@ fun ShoppingScreen(
 fun AddShoppingDialog(
     isWishlistInitial: Boolean,
     onDismiss: () -> Unit,
-    onAdd: (String, String, Double, Boolean) -> Unit
+    onAdd: (String, String, Int, Double, Boolean) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("GROCERY") }
+    var quantityText by remember { mutableStateOf("1") }
     var priceText by remember { mutableStateOf("") }
     var isWishlist by remember { mutableStateOf(isWishlistInitial) }
 
@@ -301,7 +311,7 @@ fun AddShoppingDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isWishlist) "Add Wishlist Item" else "Add Shopping Item") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -314,12 +324,20 @@ fun AddShoppingDialog(
                     label = { Text("Category (GROCERY, TECH, HOME, CLOTHING)") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = priceText,
-                    onValueChange = { priceText = it },
-                    label = { Text("Estimated Price ($)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = quantityText,
+                        onValueChange = { quantityText = it },
+                        label = { Text("Quantity") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = priceText,
+                        onValueChange = { priceText = it },
+                        label = { Text("Unit Price ($)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isWishlist, onCheckedChange = { isWishlist = it })
                     Spacer(modifier = Modifier.width(8.dp))
@@ -331,8 +349,9 @@ fun AddShoppingDialog(
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
+                        val qty = quantityText.toIntOrNull() ?: 1
                         val price = priceText.toDoubleOrNull() ?: 0.0
-                        onAdd(name, category, price, isWishlist)
+                        onAdd(name, category, qty, price, isWishlist)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)

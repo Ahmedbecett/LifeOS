@@ -20,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -96,7 +98,7 @@ fun StudyScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Course schedules, exam sprints & learning mastery",
+                            text = "Exams, spaced repetition, countdowns & daily study goals",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -138,7 +140,7 @@ fun StudyScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "LifeOS AI can generate a complete 3-week study roadmap in seconds.",
+                                text = "Generate a structured 3-week study roadmap with active recall in seconds.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -223,8 +225,8 @@ fun StudyScreen(
     if (showAddDialog) {
         AddStudyDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { subject, date, goal, notes ->
-                viewModel.addStudyPlan(subject, date, goal, notes)
+            onAdd = { subject, date, goal, notes, daily, spaced ->
+                viewModel.addStudyPlan(subject, date, goal, notes, daily, spaced)
                 showAddDialog = false
             }
         )
@@ -279,9 +281,9 @@ fun StudyPlanCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Target: ${plan.targetExamDate}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Target Exam: ${plan.targetExamDate}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = AmberAccent
                         )
                     }
                 }
@@ -296,21 +298,77 @@ fun StudyPlanCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Daily Goal & Spaced Repetition Badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    color = PurpleAccent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Goal",
+                            tint = PurpleAccent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = plan.dailyGoal,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Surface(
+                    color = CyanAccent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Spaced",
+                            tint = CyanAccent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = plan.spacedRepetitionTopic,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
             if (plan.goalDescription.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Goal: ${plan.goalDescription}",
+                        text = "Milestone: ${plan.goalDescription}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(10.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             ProgressBarWithLabel(
                 label = "Mastery & Completion",
@@ -358,18 +416,20 @@ fun StudyPlanCard(
 @Composable
 fun AddStudyDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, String) -> Unit
+    onAdd: (String, String, String, String, String, String) -> Unit
 ) {
     var subject by remember { mutableStateOf("") }
     var targetDate by remember { mutableStateOf("In 3 weeks") }
     var goalDescription by remember { mutableStateOf("") }
+    var dailyGoal by remember { mutableStateOf("2 hours deep study") }
+    var spacedRepetition by remember { mutableStateOf("Day 1, Day 3, Day 7, Day 14") }
     var notes by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New Study Plan") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = subject,
                     onValueChange = { subject = it },
@@ -383,15 +443,27 @@ fun AddStudyDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
+                    value = dailyGoal,
+                    onValueChange = { dailyGoal = it },
+                    label = { Text("Daily Study Target") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = spacedRepetition,
+                    onValueChange = { spacedRepetition = it },
+                    label = { Text("Spaced Repetition Intervals") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
                     value = goalDescription,
                     onValueChange = { goalDescription = it },
-                    label = { Text("Learning Goal (e.g. Master chapters 1-6)") },
+                    label = { Text("Milestone / Goal") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Daily Schedule / Notes") },
+                    label = { Text("Schedule Notes") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -400,7 +472,7 @@ fun AddStudyDialog(
             Button(
                 onClick = {
                     if (subject.isNotBlank()) {
-                        onAdd(subject, targetDate, goalDescription, notes)
+                        onAdd(subject, targetDate, goalDescription, notes, dailyGoal, spacedRepetition)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PurpleAccent)

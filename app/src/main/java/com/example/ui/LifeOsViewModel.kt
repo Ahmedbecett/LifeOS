@@ -38,7 +38,7 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     private val database = LifeOsDatabase.getInstance(application, viewModelScope)
     private val repository = LifeOsRepository(database.dao())
 
-    // Navigation and Language
+    // Navigation and Preferences
     private val _currentScreen = MutableStateFlow(LifeOsScreen.DASHBOARD)
     val currentScreen: StateFlow<LifeOsScreen> = _currentScreen.asStateFlow()
 
@@ -48,8 +48,14 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     private val _isPremium = MutableStateFlow(false)
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
+    private val _isDarkTheme = MutableStateFlow(true)
+    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+
     private val _notificationsEnabled = MutableStateFlow(true)
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+
+    private val _taskSearchQuery = MutableStateFlow("")
+    val taskSearchQuery: StateFlow<String> = _taskSearchQuery.asStateFlow()
 
     // Data streams
     val allTasks: StateFlow<List<TaskItem>> = repository.allTasks
@@ -98,8 +104,16 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
         _isPremium.value = !_isPremium.value
     }
 
+    fun toggleDarkTheme() {
+        _isDarkTheme.value = !_isDarkTheme.value
+    }
+
     fun toggleNotifications() {
         _notificationsEnabled.value = !_notificationsEnabled.value
+    }
+
+    fun setTaskSearchQuery(query: String) {
+        _taskSearchQuery.value = query
     }
 
     fun setAiPrompt(text: String) {
@@ -153,6 +167,12 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
                 plan.savingsGoal?.let {
                     repository.insertSavingsGoal(it)
                 }
+                // Insert shopping items if present
+                if (plan.shoppingItems.isNotEmpty()) {
+                    for (item in plan.shoppingItems) {
+                        repository.insertShoppingItem(item)
+                    }
+                }
 
                 _statusMessage.value = "Plan successfully imported into LifeOS!"
             } catch (e: Exception) {
@@ -168,7 +188,7 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addTask(title: String, description: String, category: String, priority: String, dueDate: String) {
+    fun addTask(title: String, description: String, category: String, priority: String, dueDate: String, reminderTime: String = "") {
         viewModelScope.launch {
             repository.insertTask(
                 TaskItem(
@@ -176,7 +196,8 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
                     description = description,
                     category = category,
                     priority = priority,
-                    dueDate = dueDate
+                    dueDate = dueDate,
+                    reminderTime = reminderTime
                 )
             )
         }
@@ -191,23 +212,33 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     // Trip Operations
     fun addTrip(
         destination: String,
+        startDate: String,
+        endDate: String,
         durationDays: Int,
         budget: Double,
+        spentAmount: Double = 0.0,
+        currency: String = "USD",
         accommodation: String,
         itinerary: String,
         packing: String,
-        phrases: String
+        phrases: String,
+        documents: String = "Passport & Visa\nFlight Tickets\nHotel Confirmation"
     ) {
         viewModelScope.launch {
             repository.insertTrip(
                 TripPlan(
                     destination = destination,
+                    startDate = startDate,
+                    endDate = endDate,
                     durationDays = durationDays,
                     budget = budget,
+                    spentAmount = spentAmount,
+                    currency = currency,
                     accommodation = accommodation,
                     dailyItineraryJson = itinerary,
                     packingChecklistJson = packing,
-                    usefulPhrasesJson = phrases
+                    usefulPhrasesJson = phrases,
+                    documentsJson = documents
                 )
             )
         }
@@ -220,7 +251,14 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // Study Operations
-    fun addStudyPlan(subject: String, targetExamDate: String, goalDescription: String, scheduleNotes: String) {
+    fun addStudyPlan(
+        subject: String,
+        targetExamDate: String,
+        goalDescription: String,
+        scheduleNotes: String,
+        dailyGoal: String = "2 hours focused deep study",
+        spacedRepetition: String = "Interval review: Day 1, Day 3, Day 7, Day 14"
+    ) {
         viewModelScope.launch {
             repository.insertStudyPlan(
                 StudyPlan(
@@ -228,7 +266,9 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
                     targetExamDate = targetExamDate,
                     goalDescription = goalDescription,
                     scheduleNotes = scheduleNotes,
-                    progressPercent = 0
+                    progressPercent = 0,
+                    dailyGoal = dailyGoal,
+                    spacedRepetitionTopic = spacedRepetition
                 )
             )
         }
@@ -294,7 +334,16 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // Career Operations
-    fun addCareerItem(title: String, type: String, companyOrField: String, status: String, deadline: String, notes: String) {
+    fun addCareerItem(
+        title: String,
+        type: String,
+        companyOrField: String,
+        status: String,
+        applicationDate: String = "Today",
+        deadline: String,
+        notes: String,
+        interviewQuestions: String = "STAR: Tell me about an engineering challenge you solved."
+    ) {
         viewModelScope.launch {
             repository.insertCareerItem(
                 CareerItem(
@@ -302,8 +351,10 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
                     type = type,
                     companyOrField = companyOrField,
                     status = status,
+                    applicationDate = applicationDate,
                     deadline = deadline,
-                    notes = notes
+                    notes = notes,
+                    interviewPrepQuestions = interviewQuestions
                 )
             )
         }
@@ -322,12 +373,13 @@ class LifeOsViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // Shopping Operations
-    fun addShoppingItem(name: String, category: String, estimatedPrice: Double, isWishlist: Boolean) {
+    fun addShoppingItem(name: String, category: String, quantity: Int = 1, estimatedPrice: Double, isWishlist: Boolean) {
         viewModelScope.launch {
             repository.insertShoppingItem(
                 ShoppingItem(
                     name = name,
                     category = category,
+                    quantity = quantity,
                     estimatedPrice = estimatedPrice,
                     isWishlist = isWishlist
                 )

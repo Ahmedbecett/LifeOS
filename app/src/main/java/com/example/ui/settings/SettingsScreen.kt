@@ -18,8 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
@@ -68,6 +70,7 @@ fun SettingsScreen(
     val currentLang by viewModel.currentLanguage.collectAsState()
     val strings = LocalizationManager.getStrings(currentLang)
     val isPremium by viewModel.isPremium.collectAsState()
+    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
 
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
@@ -87,10 +90,61 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Global preferences, languages, privacy & subscription tier",
+                    text = "Preferences, Free vs Pro tiers, languages & local security",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        // Appearance & Dark Mode Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(CyanAccent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Brightness4,
+                                contentDescription = "Theme",
+                                tint = CyanAccent
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Dark Mode Theme",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isDarkTheme) "Futuristic Cosmic Slate (Active)" else "Crisp Modern Light",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isDarkTheme,
+                        onCheckedChange = { viewModel.toggleDarkTheme() },
+                        colors = SwitchDefaults.colors(checkedThumbColor = CyanAccent)
+                    )
+                }
             }
         }
 
@@ -122,15 +176,45 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isPremium) "LifeOS PRO (Active)" else "LifeOS Standard (Free)",
+                                text = if (isPremium) "LifeOS AI PRO (Active)" else "LifeOS AI Standard (Free)",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isPremium) "Unlimited AI synthesis, Ad-free, deep analytics" else "Generous free limits for everyday life planning",
+                                text = if (isPremium) "Unlimited AI generation, deep automation, ad-free" else "Generous free limits for everyday life planning",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Feature Tier Breakdown
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Tier Matrix Breakdown:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = "• Free: Core dashboard, tasks, basic study tools, travel planning, finance & shopping lists.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = "• Pro: Advanced AI planning, LifeOS automation, advanced analytics & deep customization.", style = MaterialTheme.typography.bodySmall, color = CyanAccent)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Info, contentDescription = "Info", tint = AmberAccent, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Feature-gating architecture ready for future Google Play Billing.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AmberAccent
+                                )
+                            }
                         }
                     }
 
@@ -148,7 +232,7 @@ fun SettingsScreen(
                         )
                     ) {
                         Text(
-                            text = if (isPremium) "Switch to Free Tier" else "⚡ Unlock LifeOS Pro (Free Trial)",
+                            text = if (isPremium) "Switch to Free Tier" else "⚡ Unlock LifeOS AI Pro (Free Trial)",
                             fontWeight = FontWeight.Bold,
                             color = if (isPremium) MaterialTheme.colorScheme.onSurface else Color.Black
                         )
@@ -288,7 +372,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "• All your plans, tasks, finances, and trips are saved locally in private encrypted app storage.\n• LifeOS never sells or transmits your personal daily schedules to third-party ad brokers.\n• You retain full ownership and can wipe all local storage anytime.",
+                        text = "• All plans, tasks, finances, and trips are stored locally on your device via Room SQLite database.\n• Zero third-party ad tracking, no telemetry, and complete offline autonomy.\n• API keys are securely referenced via BuildConfig and never hardcoded in files.\n• You retain full ownership and can permanently erase all on-device records below.",
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -329,12 +413,12 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "LifeOS v1.0 • Global Intelligent Personal Assistant",
+                    text = "LifeOS AI v1.0.0 • Production Native Android Edition",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Native Android Edition • Kotlin & Jetpack Compose",
+                    text = "Built with Kotlin, Jetpack Compose, Room & Gemini 3.5 Flash",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )

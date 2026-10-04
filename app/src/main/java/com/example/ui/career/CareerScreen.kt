@@ -1,5 +1,6 @@
 package com.example.ui.career
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -93,7 +97,7 @@ fun CareerScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Job search, CV improvements, interview prep & goals",
+                            text = "Job application pipeline (Saved → Applied → Interviewing → Offer → Rejected)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -135,7 +139,7 @@ fun CareerScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Ask LifeOS to generate behavioral questions, technical checklists & pitch advice.",
+                                text = "Generate behavioral STAR questions, technical checklists & pitch roadmaps.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -221,8 +225,8 @@ fun CareerScreen(
     if (showAddDialog) {
         AddCareerDialog(
             onDismiss = { showAddDialog = false },
-            onAdd = { title, type, company, status, deadline, notes ->
-                viewModel.addCareerItem(title, type, company, status, deadline, notes)
+            onAdd = { title, type, company, status, appDate, deadline, notes, prep ->
+                viewModel.addCareerItem(title, type, company, status, appDate, deadline, notes, prep)
                 showAddDialog = false
             }
         )
@@ -235,7 +239,8 @@ fun CareerItemCard(
     onStatusChange: (String) -> Unit,
     onDelete: () -> Unit
 ) {
-    val statuses = listOf("SAVED", "APPLIED", "INTERVIEWING", "OFFER", "IN_PROGRESS", "COMPLETED")
+    var expanded by remember { mutableStateOf(false) }
+    val pipelineStages = listOf("SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED")
 
     Card(
         modifier = Modifier
@@ -272,7 +277,7 @@ fun CareerItemCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${item.companyOrField} • ${item.deadline}",
+                        text = "${item.companyOrField} • Applied: ${item.applicationDate} • ${item.deadline}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -284,38 +289,88 @@ fun CareerItemCard(
                         tint = RoseError.copy(alpha = 0.7f)
                     )
                 }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "Toggle"
+                    )
+                }
             }
 
-            if (item.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = item.notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Status chip selector
+            // Pipeline Stages Selector
+            Text(text = "Pipeline Status:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                statuses.take(4).forEach { st ->
+                pipelineStages.forEach { st ->
                     val isSelected = item.status.equals(st, ignoreCase = true)
+                    val chipColor = when (st) {
+                        "OFFER" -> EmeraldSuccess
+                        "INTERVIEWING" -> AmberAccent
+                        "REJECTED" -> RoseError
+                        else -> IndigoAccent
+                    }
+
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onStatusChange(st) },
-                        color = if (isSelected) IndigoAccent else MaterialTheme.colorScheme.surfaceVariant
+                        color = if (isSelected) chipColor else MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
                             text = st,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                             color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    if (item.notes.isNotBlank()) {
+                        Text(
+                            text = "Notes: ${item.notes}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (item.interviewPrepQuestions.isNotBlank()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Checklist,
+                                        contentDescription = "Prep",
+                                        tint = CyanAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Interview Prep & Behavioral Questions",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = item.interviewPrepQuestions,
+                                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -326,40 +381,73 @@ fun CareerItemCard(
 @Composable
 fun AddCareerDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, String, String, String) -> Unit
+    onAdd: (String, String, String, String, String, String, String, String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var company by remember { mutableStateOf("") }
-    var deadline by remember { mutableStateOf("Target: Q4") }
+    var status by remember { mutableStateOf("APPLIED") }
+    var appDate by remember { mutableStateOf("Today") }
+    var deadline by remember { mutableStateOf("Next Step: Screening") }
     var notes by remember { mutableStateOf("") }
+
+    val statuses = listOf("SAVED", "APPLIED", "INTERVIEWING", "OFFER", "REJECTED")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Career Milestone / Job") },
+        title = { Text("Add Job Application / Career Goal") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title (e.g. Senior Android Dev / Cloud Cert)") },
+                    label = { Text("Position / Goal Title") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = company,
                     onValueChange = { company = it },
-                    label = { Text("Company or Field") },
+                    label = { Text("Company Name / Field") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = deadline,
-                    onValueChange = { deadline = it },
-                    label = { Text("Deadline / Next Step") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = appDate,
+                        onValueChange = { appDate = it },
+                        label = { Text("Applied Date") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = deadline,
+                        onValueChange = { deadline = it },
+                        label = { Text("Next Milestone") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Text("Pipeline Status:", style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    statuses.forEach { st ->
+                        val isSel = status == st
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { status = st },
+                            color = if (isSel) IndigoAccent else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = st,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Preparation Notes / Action Items") },
+                    label = { Text("Notes & Key Requirements") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -368,7 +456,16 @@ fun AddCareerDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onAdd(title, "JOB_APPLICATION", company, "IN_PROGRESS", deadline, notes)
+                        onAdd(
+                            title,
+                            "JOB_APPLICATION",
+                            company,
+                            status,
+                            appDate,
+                            deadline,
+                            notes,
+                            "STAR: Tell me about an engineering challenge you solved.\nSTAR: Describe how you handle conflicting deadlines."
+                        )
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = IndigoAccent)

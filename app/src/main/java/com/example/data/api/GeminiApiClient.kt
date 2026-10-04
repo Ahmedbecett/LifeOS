@@ -3,6 +3,7 @@ package com.example.data.api
 import android.util.Log
 import com.example.BuildConfig
 import com.example.data.model.SavingsGoal
+import com.example.data.model.ShoppingItem
 import com.example.data.model.StudyPlan
 import com.example.data.model.TaskItem
 import com.example.data.model.TripPlan
@@ -19,11 +20,12 @@ import java.util.concurrent.TimeUnit
 data class AiGeneratedPlan(
     val title: String,
     val summary: String,
-    val planType: String, // TRAVEL, STUDY, FINANCE, RELOCATION, CAREER, GENERAL
+    val planType: String, // TRAVEL, STUDY, FINANCE, RELOCATION, CAREER, GENERAL, SHOPPING, DAY_PLAN
     val tasks: List<TaskItem> = emptyList(),
     val trip: TripPlan? = null,
     val studyPlan: StudyPlan? = null,
     val savingsGoal: SavingsGoal? = null,
+    val shoppingItems: List<ShoppingItem> = emptyList(),
     val detailsText: String = ""
 )
 
@@ -61,8 +63,8 @@ object GeminiApiClient {
 
     private fun callGeminiApi(prompt: String, apiKey: String): String {
         val systemPrompt = """
-You are LifeOS, the ultimate intelligent life assistant.
-The user provides a life goal or request (e.g. travel, study for exam, savings goal, relocation, career move).
+You are LifeOS AI, the ultimate intelligent life assistant.
+The user provides a life goal or request (e.g. travel, study for exam, savings goal, relocation, career move, daily routine, shopping list).
 Create a complete, actionable, highly practical plan.
 Your response MUST include:
 1. Short Catchy Title (e.g. "7-Day Turkey Expedition on $800")
@@ -123,7 +125,9 @@ Be encouraging, realistic, and structured.
             lowerPrompt.contains("exam") || lowerPrompt.contains("study") || lowerPrompt.contains("homework") ||
                     lowerPrompt.contains("learn") || lowerPrompt.contains("course") -> "STUDY"
             lowerPrompt.contains("save") || lowerPrompt.contains("budget") || lowerPrompt.contains("money") ||
-                    lowerPrompt.contains("finance") || lowerPrompt.contains("dollar") -> "FINANCE"
+                    lowerPrompt.contains("finance") || lowerPrompt.contains("expense") -> "FINANCE"
+            lowerPrompt.contains("shop") || lowerPrompt.contains("grocery") || lowerPrompt.contains("buy") -> "SHOPPING"
+            lowerPrompt.contains("plan my day") || lowerPrompt.contains("routine") || lowerPrompt.contains("today") -> "DAY_PLAN"
             lowerPrompt.contains("moving") || lowerPrompt.contains("move") || lowerPrompt.contains("relocat") ||
                     lowerPrompt.contains("city") || lowerPrompt.contains("apartment") -> "RELOCATION"
             lowerPrompt.contains("job") || lowerPrompt.contains("career") || lowerPrompt.contains("interview") ||
@@ -135,7 +139,6 @@ Be encouraging, realistic, and structured.
         val title = lines.firstOrNull { it.startsWith("#") || it.contains("Plan") || it.length in 5..60 }
             ?.replace("#", "")?.trim() ?: "Custom LifeOS Plan: $prompt"
 
-        // Generate tasks from bullet points in the AI text
         val bulletTasks = lines
             .filter { it.trim().startsWith("- [ ]") || it.trim().startsWith("- ") || it.trim().startsWith("* ") || it.trim().matches(Regex("^\\d+\\..*")) }
             .take(6)
@@ -144,16 +147,16 @@ Be encouraging, realistic, and structured.
                 TaskItem(
                     title = cleaned.take(70),
                     description = cleaned,
-                    category = planType,
+                    category = if (planType == "DAY_PLAN") "GENERAL" else planType,
                     priority = "HIGH",
                     dueDate = "Within 7 days"
                 )
             }
 
         val tasks = if (bulletTasks.isNotEmpty()) bulletTasks else listOf(
-            TaskItem(title = "Execute Phase 1 of $title", category = planType, priority = "HIGH", dueDate = "Day 1"),
-            TaskItem(title = "Review Milestones and Budget", category = planType, priority = "MEDIUM", dueDate = "Day 3"),
-            TaskItem(title = "Finalize Preparation Checklist", category = planType, priority = "HIGH", dueDate = "Day 5")
+            TaskItem(title = "Execute Phase 1 of $title", category = if (planType == "DAY_PLAN") "GENERAL" else planType, priority = "HIGH", dueDate = "Day 1"),
+            TaskItem(title = "Review Milestones and Budget", category = if (planType == "DAY_PLAN") "GENERAL" else planType, priority = "MEDIUM", dueDate = "Day 3"),
+            TaskItem(title = "Finalize Preparation Checklist", category = if (planType == "DAY_PLAN") "GENERAL" else planType, priority = "HIGH", dueDate = "Day 5")
         )
 
         val trip = if (planType == "TRAVEL") {
@@ -162,11 +165,14 @@ Be encouraging, realistic, and structured.
                 startDate = "Next Month",
                 durationDays = 7,
                 budget = extractBudget(prompt),
+                spentAmount = 0.0,
+                currency = "USD",
                 accommodation = "Central Hotel / AirBnb",
                 notes = "Generated by LifeOS AI Assistant based on: $prompt",
                 dailyItineraryJson = text,
                 packingChecklistJson = "Passport & ID\nUniversal charger\nLocal currency & cards\nWeather-appropriate clothing\nMedicines & toiletries",
-                usefulPhrasesJson = "Hello = Merhaba / Bonjour / Hola\nThank you = Teşekkürler / Merci / Gracias\nHow much? = Ne kadar? / Combien? / Cuánto?"
+                usefulPhrasesJson = "Hello = Merhaba / Bonjour / Hola\nThank you = Teşekkürler / Merci / Gracias\nHow much? = Ne kadar? / Combien? / Cuánto?",
+                documentsJson = "Passport (valid 6+ months)\nE-Visa Application\nRound-trip Flight Tickets\nHotel Booking Confirmation"
             )
         } else null
 
@@ -176,7 +182,9 @@ Be encouraging, realistic, and structured.
                 targetExamDate = "3 Weeks",
                 goalDescription = "Score Top Tier Mastery",
                 scheduleNotes = text,
-                progressPercent = 10
+                progressPercent = 10,
+                dailyGoal = "2 hours focused deep study",
+                spacedRepetitionTopic = "Day 1 (Core Concepts), Day 3 (Practice), Day 7 (Mock)"
             )
         } else null
 
@@ -190,6 +198,14 @@ Be encouraging, realistic, and structured.
             )
         } else null
 
+        val shopping = if (planType == "SHOPPING") {
+            listOf(
+                ShoppingItem(name = "Core Grocery Essentials", category = "GROCERY", quantity = 1, estimatedPrice = 45.0),
+                ShoppingItem(name = "Fresh Produce & Healthy Snacks", category = "GROCERY", quantity = 1, estimatedPrice = 25.0),
+                ShoppingItem(name = "Household Cleaning Supplies", category = "HOME", quantity = 1, estimatedPrice = 18.0)
+            )
+        } else emptyList()
+
         return AiGeneratedPlan(
             title = title,
             summary = lines.take(3).joinToString(" ").replace("#", ""),
@@ -198,6 +214,7 @@ Be encouraging, realistic, and structured.
             trip = trip,
             studyPlan = study,
             savingsGoal = savings,
+            shoppingItems = shopping,
             detailsText = text
         )
     }
@@ -205,79 +222,143 @@ Be encouraging, realistic, and structured.
     fun generateOfflineSmartPlan(prompt: String): AiGeneratedPlan {
         val lower = prompt.lowercase()
         return when {
-            // Travel prompt like "I'm traveling to Turkey next month for 7 days with a budget of $800"
-            lower.contains("turkey") || (lower.contains("travel") && lower.contains("7 day")) -> {
+            // "Plan my day"
+            lower.contains("plan my day") || lower.contains("daily plan") -> {
+                val daySchedule = """
+07:30 - Morning Energizer: Hydration, 15m stretch & healthy breakfast.
+08:30 - Deep Work Sprint 1: High-priority project deliverables (zero distractions).
+11:30 - Quick Reset: 15m walk & review daily inbox.
+12:30 - Nutritious Lunch & screen-free rest.
+14:00 - Focus Block 2: Secondary tasks, meetings & collaborative work.
+16:30 - LifeOS Daily Audit: Check off tasks, log expenses & update savings.
+18:00 - Study / Exercise session (45 minutes).
+21:30 - Night Wind-down: Reading, planning tomorrow & 8 hours sleep prep.
+                """.trimIndent()
+
+                AiGeneratedPlan(
+                    title = "High-Focus Daily Blueprint",
+                    summary = "An optimized circadian-aligned daily schedule prioritizing deep work in the morning and self-care in the evening.",
+                    planType = "DAY_PLAN",
+                    tasks = listOf(
+                        TaskItem(title = "Morning Deep Work Sprint (Block 1)", category = "WORK", priority = "HIGH", dueDate = "Today 08:30"),
+                        TaskItem(title = "Log daily expenses & reconcile balance", category = "FINANCE", priority = "MEDIUM", dueDate = "Today 16:30"),
+                        TaskItem(title = "45-minute focused study or workout session", category = "STUDY", priority = "HIGH", dueDate = "Today 18:00"),
+                        TaskItem(title = "Evening wind-down & plan next day in LifeOS", category = "GENERAL", priority = "LOW", dueDate = "Tonight 21:30")
+                    ),
+                    detailsText = daySchedule
+                )
+            }
+
+            // "Create a shopping list"
+            lower.contains("shopping list") || lower.contains("grocer") -> {
+                val shoppingDetails = """
+Organized Smart Shopping List:
+• Produce: Bananas, spinach, avocados, honeycrisp apples (~$18.50)
+• Pantry & Dairy: Almond milk, sourdough bread, eggs, organic oats (~$16.00)
+• Protein & Healthy Fats: Chicken breast/tofu, olive oil, walnuts (~$28.00)
+• Household: Biodegradable dish soap & paper towels (~$9.50)
+
+Total Estimated Cost: ~$72.00 (within standard weekly allowance)
+                """.trimIndent()
+
+                AiGeneratedPlan(
+                    title = "Weekly Restock & Grocery Checklist",
+                    summary = "A nutritious, balanced shopping list structured by supermarket aisles to minimize wasted time and budget overruns.",
+                    planType = "SHOPPING",
+                    tasks = listOf(
+                        TaskItem(title = "Check refrigerator inventory & pantry staples", category = "SHOPPING", priority = "MEDIUM", dueDate = "Before Store"),
+                        TaskItem(title = "Purchase weekly groceries ($72 budget)", category = "SHOPPING", priority = "HIGH", dueDate = "This Saturday")
+                    ),
+                    shoppingItems = listOf(
+                        ShoppingItem(name = "Organic Eggs & Sourdough", category = "GROCERY", quantity = 1, estimatedPrice = 8.50),
+                        ShoppingItem(name = "Fresh Produce (Greens & Fruits)", category = "GROCERY", quantity = 1, estimatedPrice = 18.50),
+                        ShoppingItem(name = "Almond Milk & Rolled Oats", category = "GROCERY", quantity = 1, estimatedPrice = 7.50),
+                        ShoppingItem(name = "Chicken Breast / Tofu Pack", category = "GROCERY", quantity = 2, estimatedPrice = 16.00),
+                        ShoppingItem(name = "Eco Dish Soap", category = "HOME", quantity = 1, estimatedPrice = 4.50)
+                    ),
+                    detailsText = shoppingDetails
+                )
+            }
+
+            // "Plan a trip" or Turkey Prompt
+            lower.contains("turkey") || (lower.contains("travel") || lower.contains("plan a trip")) -> {
+                val dest = if (lower.contains("turkey")) "Turkey (Istanbul & Cappadocia)" else extractDestination(prompt)
+                val budget = extractBudget(prompt)
+
                 val itinerary = """
-Day 1: Arrive in Istanbul, airport shuttle to Sultanahmet, explore Sultanahmet Square & Blue Mosque.
-Day 2: Visit Hagia Sophia, Basilica Cistern, Grand Bazaar for local spices & Turkish tea.
-Day 3: Bosphorus public ferry cruise, Galata Tower climb, sunset dinner at Karaköy ($20).
-Day 4: Morning domestic flight/overnight bus to Cappadocia, check into Göreme Cave Suite.
-Day 5: Sunrise Hot Air Balloon observation, hike through Red Valley & Love Valley.
-Day 6: Derinkuyu Underground City tour, Uchisar Castle panoramic view & Hamam bath.
-Day 7: Souvenir shopping, Turkish delight tasting, return flight back home.
+Day 1: Arrival & check-in, orientation walk in central historical quarter.
+Day 2: Top cultural landmarks, ancient mosques/museums & scenic river cruise.
+Day 3: Traditional bazaar spice exploration, local street food & viewpoint tower.
+Day 4: Travel to regional highlight (e.g. Cappadocia fairy chimneys / historic coast).
+Day 5: Sunrise sightseeing activity, valley hike & local artisan craft workshop.
+Day 6: Underground city / archaeological ruins & traditional thermal bath.
+Day 7: Souvenir shopping, local confection tastings & return flight home.
                 """.trimIndent()
 
                 val budgetNotes = """
-Budget Breakdown ($800 Total):
-• Flights / Long distance transport: $260
-• Accommodation (6 nights @ $45 avg): $270
-• Food & Drinks ($25/day): $175
-• Activities & Museum passes: $95
-Total Estimated: $800 (Balanced & Achievable)
+Budget Allocation ($${budget.toInt()} Total):
+• Flights / Long-distance transit: ~$${(budget * 0.32).toInt()}
+• Boutique Accommodation: ~$${(budget * 0.35).toInt()}
+• Dining & Culinary: ~$${(budget * 0.20).toInt()}
+• Museum Passes & Activities: ~$${(budget * 0.13).toInt()}
+Estimated Balance: On Track ($${budget.toInt()})
                 """.trimIndent()
 
                 val checklist = """
 Passport with 6+ months validity
-Turkish E-Visa (if required)
-Offline Google Maps of Istanbul & Göreme
-Turkish Lira cash (500 TL for tips & street stalls)
-Comfortable walking sneakers
-Modest scarf/covering for mosque visits
-Power adapter (European Type C/F)
+E-Visa & Travel Insurance documents
+Power bank & universal travel adapter
+Comfortable walking shoes
+Modest clothing for religious cultural sites
+Local currency cash + foreign exchange debit card
                 """.trimIndent()
 
                 val phrases = """
-Merhaba = Hello
-Teşekkür ederim = Thank you
-Lütfen = Please
-Hesap lütfen = Check / Bill please
-Ne kadar? = How much is this?
-İndirim var mı? = Is there a discount?
-İyi günler = Have a great day
+Hello = Merhaba
+Thank you = Teşekkür ederim
+Please = Lütfen
+The bill please = Hesap lütfen
+How much is this? = Ne kadar?
+Do you speak English? = İngilizce biliyor musunuz?
+Have a great day = İyi günler
                 """.trimIndent()
 
                 AiGeneratedPlan(
-                    title = "7-Day Turkey Expedition ($800 Budget)",
-                    summary = "A comprehensive 7-day itinerary covering Istanbul historic districts and Cappadocia fairy chimneys within a strict $800 budget.",
+                    title = "7-Day $dest Expedition ($${budget.toInt()} Budget)",
+                    summary = "A comprehensive 7-day itinerary covering top highlights, historical monuments, and culinary delights within a $$budget budget.",
                     planType = "TRAVEL",
                     tasks = listOf(
-                        TaskItem(title = "Check passport validity & apply for Turkey E-Visa", category = "TRAVEL", priority = "HIGH", dueDate = "Day 1"),
-                        TaskItem(title = "Book Istanbul Sultanahmet hotel & Göreme cave room", category = "TRAVEL", priority = "HIGH", dueDate = "Day 2"),
-                        TaskItem(title = "Exchange 500-1000 Turkish Lira or notify bank for ATM card", category = "FINANCE", priority = "MEDIUM", dueDate = "Day 4"),
-                        TaskItem(title = "Download Istanbulkart public transit app and offline maps", category = "TRAVEL", priority = "MEDIUM", dueDate = "Day 5"),
-                        TaskItem(title = "Pack modest mosque attire and Cappadocia morning layer", category = "TRAVEL", priority = "LOW", dueDate = "Day 6")
+                        TaskItem(title = "Check passport validity & travel visa requirements", category = "TRAVEL", priority = "HIGH", dueDate = "Day 1"),
+                        TaskItem(title = "Book boutique accommodation & internal transit", category = "TRAVEL", priority = "HIGH", dueDate = "Day 2"),
+                        TaskItem(title = "Withdraw local travel currency cash for markets", category = "FINANCE", priority = "MEDIUM", dueDate = "Day 4"),
+                        TaskItem(title = "Download offline maps and translation packs", category = "TRAVEL", priority = "MEDIUM", dueDate = "Day 5"),
+                        TaskItem(title = "Pack modest attire and comfortable footwear", category = "TRAVEL", priority = "LOW", dueDate = "Day 6")
                     ),
                     trip = TripPlan(
-                        destination = "Turkey (Istanbul & Cappadocia)",
-                        startDate = "Next Month",
+                        destination = dest,
+                        startDate = "Nov 12, 2026",
+                        endDate = "Nov 19, 2026",
                         durationDays = 7,
-                        budget = 800.0,
-                        accommodation = "Sultanahmet Boutique Hotel & Göreme Cave Suite",
+                        budget = budget,
+                        spentAmount = 0.0,
+                        currency = if (lower.contains("turkey")) "TRY" else "USD",
+                        accommodation = "Boutique Central Hotel / Cave Suite",
                         notes = budgetNotes,
                         dailyItineraryJson = itinerary,
                         packingChecklistJson = checklist,
-                        usefulPhrasesJson = phrases
+                        usefulPhrasesJson = phrases,
+                        documentsJson = "Passport (valid 6+ months)\nE-Visa Approval\nFlight Confirmation\nHotel Reservation Voucher\nTravel Health Insurance"
                     ),
-                    detailsText = "$itinerary\n\n$budgetNotes\n\nKey Checklist:\n$checklist\n\nPhrases:\n$phrases"
+                    detailsText = "$itinerary\n\n$budgetNotes\n\nDocuments & Checklist:\n$checklist\n\nUseful Phrases:\n$phrases"
                 )
             }
 
-            // Study prompt like "I have an exam in three weeks and I need a study plan"
+            // "Create a study plan" or Exam Prompt
             lower.contains("exam") || lower.contains("study") || lower.contains("three weeks") -> {
                 val studySchedule = """
-Week 1: Core Foundation & Theory Acquisition (Days 1–7)
+Week 1: Foundations & Comprehensive Audit (Days 1–7)
 • Days 1–2: Audit syllabus, highlight weak spots, organize lecture notes.
-• Days 3–5: Deep dive into Chapters 1 to 4 with Pomodoro technique (4 x 25 min sessions).
+• Days 3–5: Deep dive into core modules with Pomodoro technique (4 x 25 min sessions).
 • Days 6–7: Active recall flashcards creation & initial end-of-chapter problems.
 
 Week 2: Intensive Practice & Application (Days 8–14)
@@ -303,18 +384,20 @@ Week 3: Mock Exams & Peak Performance (Days 15–21)
                         TaskItem(title = "Final simulation test & ensure 8h sleep before exam day", category = "STUDY", priority = "HIGH", dueDate = "Week 3 - Day 20")
                     ),
                     studyPlan = StudyPlan(
-                        subject = "Comprehensive Exam Preparation",
+                        subject = extractSubject(prompt),
                         targetExamDate = "In 3 Weeks",
                         goalDescription = "Score in Top 10% with active recall and practice testing",
                         scheduleNotes = studySchedule,
-                        progressPercent = 15
+                        progressPercent = 15,
+                        dailyGoal = "2 hours focused deep study",
+                        spacedRepetitionTopic = "Spaced intervals: Day 1, Day 3, Day 7, Day 14"
                     ),
                     detailsText = studySchedule
                 )
             }
 
-            // Savings prompt like "I need to save $1,000 in six months"
-            lower.contains("save") || lower.contains("1000") || lower.contains("1,000") || lower.contains("six months") -> {
+            // "Track my expenses" or Savings Prompt
+            lower.contains("save") || lower.contains("1000") || lower.contains("expense") || lower.contains("budget") -> {
                 val financeBreakdown = """
 Target: Save $1,000 in 6 Months (26 Weeks)
 
@@ -349,47 +432,7 @@ Total projected savings: ~$190/month (Exceeds goal ahead of schedule!)
                 )
             }
 
-            // Moving / Relocation prompt like "I'm moving to another city next month"
-            lower.contains("mov") || lower.contains("relocat") || lower.contains("city") -> {
-                val relocationPlan = """
-4-Week City Relocation Blueprint:
-
-Week 4 Prior:
-• Confirm new lease, move-in date, key handover protocol.
-• Declutter room-by-room: Sell on marketplace or donate clothes.
-• Request moving quotes (van rental vs movers).
-
-Week 3 Prior:
-• Collect 15-20 sturdy boxes, bubble wrap, tape & labeling markers.
-• Notify current landlord or agent in writing.
-• Begin packing out-of-season clothes and books.
-
-Week 2 Prior:
-• Schedule electricity, internet, gas & water transfer for move-in day.
-• Submit postal address change & update bank address.
-• Pack kitchen non-essentials and decorative items.
-
-Week 1 Prior & Move Day:
-• Pack "Day One Survival Box": Toiletries, bed linens, phone chargers, kettle, important documents.
-• Defrost fridge 24h prior, clean previous apartment for deposit return.
-• Final walkthrough, meter readings snapshot, celebrate arrival!
-                """.trimIndent()
-
-                AiGeneratedPlan(
-                    title = "Seamless City Relocation Checklist",
-                    summary = "A 4-week timeline covering logistics, utilities transfer, decluttering, and move-day essentials.",
-                    planType = "RELOCATION",
-                    tasks = listOf(
-                        TaskItem(title = "Schedule electricity and home WiFi activation at new home", category = "WORK", priority = "HIGH", dueDate = "2 Weeks Before"),
-                        TaskItem(title = "Declutter closet and donate unused items", category = "GENERAL", priority = "MEDIUM", dueDate = "3 Weeks Before"),
-                        TaskItem(title = "Pack 'Day One Survival Box' (documents, chargers, bedding)", category = "GENERAL", priority = "HIGH", dueDate = "1 Day Before"),
-                        TaskItem(title = "Take photos of utility meters and apartment condition", category = "FINANCE", priority = "HIGH", dueDate = "Move Day")
-                    ),
-                    detailsText = relocationPlan
-                )
-            }
-
-            // General or Career
+            // General or Moving
             else -> {
                 val generalPlan = """
 Actionable Master Plan for: "$prompt"
@@ -424,11 +467,11 @@ Actionable Master Plan for: "$prompt"
         return when {
             lower.contains("turkey") -> "Turkey"
             lower.contains("japan") -> "Japan"
-            lower.contains("france") -> "France"
-            lower.contains("italy") -> "Italy"
-            lower.contains("spain") -> "Spain"
+            lower.contains("france") || lower.contains("paris") -> "Paris, France"
+            lower.contains("italy") || lower.contains("rome") -> "Rome, Italy"
+            lower.contains("spain") || lower.contains("barcelona") -> "Spain"
             lower.contains("germany") -> "Germany"
-            lower.contains("dubai") -> "Dubai"
+            lower.contains("dubai") -> "Dubai, UAE"
             lower.contains("uk") || lower.contains("london") -> "London, UK"
             else -> "Dream Destination"
         }
@@ -443,7 +486,7 @@ Actionable Master Plan for: "$prompt"
         val lower = prompt.lowercase()
         return when {
             lower.contains("math") -> "Mathematics & Calculus"
-            lower.contains("program") || lower.contains("cod") || lower.contains("computer") -> "Computer Science"
+            lower.contains("program") || lower.contains("cod") || lower.contains("computer") -> "Computer Science & Algorithms"
             lower.contains("physics") -> "Physics"
             lower.contains("biology") -> "Biology & Medical Science"
             lower.contains("history") -> "History & Social Sciences"

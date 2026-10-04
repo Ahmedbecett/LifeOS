@@ -21,13 +21,17 @@ data class TripPlan(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val destination: String,
     val startDate: String = "",
+    val endDate: String = "",
     val durationDays: Int = 7,
     val budget: Double = 0.0,
+    val spentAmount: Double = 0.0,
+    val currency: String = "USD",
     val accommodation: String = "",
     val notes: String = "",
-    val dailyItineraryJson: String = "", // JSON list or pipe-separated
-    val packingChecklistJson: String = "", // items separated by newline
-    val usefulPhrasesJson: String = "", // phrases
+    val dailyItineraryJson: String = "",
+    val packingChecklistJson: String = "",
+    val usefulPhrasesJson: String = "",
+    val documentsJson: String = "Passport & Visa Copy\nFlight Confirmation\nHotel Reservation Voucher\nTravel Medical Insurance",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -39,6 +43,8 @@ data class StudyPlan(
     val goalDescription: String = "",
     val scheduleNotes: String = "",
     val progressPercent: Int = 0,
+    val dailyGoal: String = "2 hours focused deep study",
+    val spacedRepetitionTopic: String = "Review interval: Day 1, Day 3, Day 7, Day 14",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -48,7 +54,7 @@ data class FinanceTransaction(
     val title: String,
     val amount: Double,
     val type: String, // INCOME or EXPENSE
-    val category: String, // FOOD, TRANSPORT, HOUSING, SHOPPING, ENTERTAINMENT, TRAVEL, EDUCATION, OTHER
+    val category: String, // FOOD, TRANSPORT, HOUSING, SHOPPING, TRAVEL, OTHER
     val date: String,
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis()
@@ -71,9 +77,11 @@ data class CareerItem(
     val title: String,
     val type: String = "JOB_APPLICATION", // JOB_APPLICATION, GOAL, INTERVIEW_PREP, CV_NOTE
     val companyOrField: String = "",
-    val status: String = "IN_PROGRESS", // SAVED, APPLIED, INTERVIEWING, OFFER, IN_PROGRESS, COMPLETED
+    val status: String = "APPLIED", // SAVED, APPLIED, INTERVIEWING, OFFER, REJECTED
+    val applicationDate: String = "Recent",
     val deadline: String = "",
     val notes: String = "",
+    val interviewPrepQuestions: String = "STAR Method: Situation, Task, Action, Result.\nQ: Describe a difficult engineering obstacle and your solution.\nQ: How do you align priorities when multiple deadlines collide?",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -82,6 +90,7 @@ data class ShoppingItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val category: String = "GROCERY", // GROCERY, TECH, HOME, CLOTHING, WISHLIST
+    val quantity: Int = 1,
     val estimatedPrice: Double = 0.0,
     val isPurchased: Boolean = false,
     val isWishlist: Boolean = false,

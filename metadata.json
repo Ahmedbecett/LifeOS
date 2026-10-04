@@ -1,6 +1,6 @@
 {
-  "name": "LifeOS",
-  "description": "All-in-one AI-powered personal life assistant for organizing travel, study, career, personal finance, tasks, and daily planning.",
+  "name": "LifeOS AI",
+  "description": "Production-ready AI-powered personal life assistant for organizing travel, study, career, personal finance, tasks, and daily planning.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

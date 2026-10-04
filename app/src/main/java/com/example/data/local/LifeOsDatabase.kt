@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
         CareerItem::class,
         ShoppingItem::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class LifeOsDatabase : RoomDatabase() {
@@ -43,6 +43,7 @@ abstract class LifeOsDatabase : RoomDatabase() {
                     LifeOsDatabase::class.java,
                     "lifeos_database.db"
                 )
+                .fallbackToDestructiveMigration()
                 .addCallback(DatabaseCallback(scope))
                 .build()
                 INSTANCE = instance
@@ -101,7 +102,7 @@ abstract class LifeOsDatabase : RoomDatabase() {
                     )
                 )
 
-                // Initial Trip Plan (matching the user's Turkey prompt example!)
+                // Initial Trip Plan (matching user's Turkey prompt example!)
                 val turkeyItinerary = """
 Day 1: Arrival in Istanbul, check-in Sultanahmet, Grand Bazaar stroll & Turkish coffee
 Day 2: Hagia Sophia, Blue Mosque & Bosphorus Sunset Cruise ($25)
@@ -135,14 +136,18 @@ Ne kadar? = How much is this?
                 dao.insertTrip(
                     TripPlan(
                         destination = "Turkey (Istanbul & Cappadocia)",
-                        startDate = "Next Month (7 Days)",
+                        startDate = "Nov 12, 2026",
+                        endDate = "Nov 19, 2026",
                         durationDays = 7,
                         budget = 800.0,
+                        spentAmount = 310.0,
+                        currency = "USD",
                         accommodation = "Cave Suite in Göreme & Boutique Hotel in Sultanahmet",
                         notes = "Estimated flight: $260, Accommodation: $280, Food & Transport: $160, Activities: $100. Total within $800 budget.",
                         dailyItineraryJson = turkeyItinerary,
                         packingChecklistJson = turkeyPacking,
-                        usefulPhrasesJson = turkeyPhrases
+                        usefulPhrasesJson = turkeyPhrases,
+                        documentsJson = "Passport (valid 6+ months)\nTurkish E-Visa Approval\nTurkish Airlines E-Tickets\nBooking Confirmation #TK-9821\nTravel Medical Insurance"
                     )
                 )
 
@@ -153,7 +158,9 @@ Ne kadar? = How much is this?
                         targetExamDate = "In 3 weeks",
                         goalDescription = "Master Graphs, Dynamic Programming & System Architecture",
                         scheduleNotes = "Week 1: Graph BFS/DFS & Dijkstra\nWeek 2: Dynamic Programming patterns\nWeek 3: Mock exams and timed coding sprints",
-                        progressPercent = 45
+                        progressPercent = 45,
+                        dailyGoal = "2 hours active recall & 3 LeetCode problems",
+                        spacedRepetitionTopic = "Interval review: Day 1 (Graphs), Day 3 (Trees), Day 7 (DP), Day 14 (Full Mock)"
                     )
                 )
 
@@ -213,8 +220,10 @@ Ne kadar? = How much is this?
                         type = "JOB_APPLICATION",
                         companyOrField = "Global FinTech Labs",
                         status = "INTERVIEWING",
+                        applicationDate = "2 weeks ago",
                         deadline = "Technical Round next Tuesday",
-                        notes = "Review coroutines, MVI/MVVM, and clean architecture"
+                        notes = "Review coroutines, MVI/MVVM, and clean architecture",
+                        interviewPrepQuestions = "STAR: Describe a complex asynchronous bug you resolved in Kotlin Flow.\nSTAR: How do you enforce modular architecture in Android teams?"
                     )
                 )
                 dao.insertCareerItem(
@@ -222,7 +231,8 @@ Ne kadar? = How much is this?
                         title = "System Design & Cloud Certification",
                         type = "GOAL",
                         companyOrField = "Professional Skill",
-                        status = "IN_PROGRESS",
+                        status = "APPLIED",
+                        applicationDate = "Oct 01",
                         deadline = "Target: End of Q4",
                         notes = "Complete 1 practice exam per week"
                     )
@@ -234,18 +244,21 @@ Ne kadar? = How much is this?
                         ShoppingItem(
                             name = "Organic Espresso Beans",
                             category = "GROCERY",
+                            quantity = 2,
                             estimatedPrice = 14.99,
                             isPurchased = true
                         ),
                         ShoppingItem(
                             name = "Universal Travel Power Plug",
                             category = "TECH",
+                            quantity = 1,
                             estimatedPrice = 18.50,
                             isPurchased = false
                         ),
                         ShoppingItem(
                             name = "Noise-Cancelling Travel Headphones",
                             category = "WISHLIST",
+                            quantity = 1,
                             estimatedPrice = 199.00,
                             isPurchased = false,
                             isWishlist = true
